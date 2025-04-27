@@ -39,4 +39,18 @@ impl Git {
         let stdout = String::from_utf8_lossy(&output.stdout);
         Some(stdout.trim().to_string())
     }
+
+    pub fn get_branch() -> Option<String> {
+        let output = Command::new("git")
+            .args(["branch", "--show-current"])
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        (!stdout.is_empty()).then_some(stdout)
+    }
 }

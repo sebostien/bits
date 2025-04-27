@@ -27,6 +27,7 @@ struct GitOpen {
     priority: i32,
     remote: String,
     url: String,
+    branch: Option<String>,
     commit: Option<String>,
     patterns: Vec<PatternOpen>,
 }
@@ -132,6 +133,12 @@ impl Open {
 impl GitOpen {
     fn get_base(&self, text: &str, is_commit: bool) -> Option<String> {
         if text == "." {
+            if let Some(branch_url) = &self.branch {
+                if let Some(branch) = Git::get_branch() {
+                    return Some(branch_url.replacen("<branch>", &branch, 1));
+                }
+            }
+
             return Some(self.url.clone());
         }
 
@@ -187,13 +194,13 @@ mod tests {
     #[test]
     fn test_open_pattern() {
         let open = get_open_config();
-        let can = open.open_pattern("test-123").unwrap();
+        let can = open.open_pattern("test-123");
 
         assert_eq!(can.len(), 1);
         assert_eq!(can[0].url, "https://example.com/123");
         assert_eq!(can[0].priority, 1);
 
-        let can = open.open_pattern("feature-123").unwrap();
+        let can = open.open_pattern("feature-123");
         assert!(can.is_empty());
     }
 
@@ -202,6 +209,7 @@ mod tests {
             priority: 1,
             remote: "https?://repo.com/(\\.*).git".to_string(),
             url: "https://repo.com/<r1>/".to_string(),
+            branch: None,
             commit: Some("https://repo.com/<r1>/<commit>".to_string()),
             patterns: vec![PatternOpen {
                 priority: 2,

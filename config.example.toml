@@ -1,10 +1,16 @@
 [open]
 program = "/usr/bin/firefox"
 
+# TODO: Transform match group, e.g. uppercase
+
 # Matches the given pattern and replaces t 
 patterns = [
   { pattern = "^(https?://.+)$", url = "<pat1>" },
   { pattern = "(TEST-\\d{4,5})", url = "example.com/<pat1>" },
+  { pattern = "^~/(.*)$", url = "/home/me/<pat1>" },
+  { pattern = "^(/home/me/.*)$", url = "<pat1>" },
+  # Open mounted windows drive (WSL)
+  { pattern = "^/mnt/(\\w+)/(.*)", url = "<pat1>:/<pat2>" },
 ]
 
 [open.git.github_ssh]
@@ -12,6 +18,8 @@ patterns = [
 remote = "git@github.com:(.+)/(.+).git"
 # If the remote matches and the input text is ".", open this url
 url = "https://github.com/<r1>/<r2>/"
+# If the remote matches and the branch can be found, open this url
+branch = "https://github.com/<r1>/<r2>/tree/<branch>"
 # If the remote matches and the input text is a commit hash.
 # Open this url (replacing <commit> with the commit)
 commit = "https://github.com/<r1>/<r2>/commit/<commit>"
@@ -19,13 +27,14 @@ commit = "https://github.com/<r1>/<r2>/commit/<commit>"
 # Open the url (replacing <patN> with the groups)
 # Will take the first one that matches
 patterns = [
-  { pattern = "^(\\d+)$", url = "https://github.com/<r1>/<r2>/pull/<pat1>" }
+  { pattern = "^(\\d+)$", url = "https://github.com/<r1>/<r2>/pull/<pat1>" },
 ]
 
 [open.git.github_https]
 remote = "https://github.com/(.+)/(.+).git"
 url = "https://github.com/<r1>/<r2>/"
+branch = "https://github.com/<r1>/<r2>/tree/<branch>"
 commit = "https://github.com/<r1>/<r2>/commit/<commit>"
 patterns = [
-  { pattern = "^(\\d+)$", url = "https://github.com/<r1>/<r2>/pull/<pat1>" }
+  { pattern = "^(\\d+)$", url = "https://github.com/<r1>/<r2>/pull/<pat1>" },
 ]
