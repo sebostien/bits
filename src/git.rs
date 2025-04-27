@@ -26,7 +26,7 @@ impl Git {
         Ok(None)
     }
 
-    pub fn is_commit(text: &str) -> Option<String> {
+    pub fn rev_parse(text: &str) -> Option<String> {
         let output = Command::new("git")
             .args(["rev-parse", text])
             .output()

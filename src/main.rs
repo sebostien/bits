@@ -2,10 +2,12 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use std::{io, path::PathBuf, process::ExitCode};
+use term_colors::TermColors;
 
 mod config;
 mod git;
 mod open;
+mod term_colors;
 
 use config::Config;
 
@@ -24,6 +26,7 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     Open { text: String },
+    PrintColors,
     Completions { shell: Shell },
 }
 
@@ -62,6 +65,7 @@ pub fn run(args: Cli) -> Result<()> {
 
     match args.command {
         Commands::Open { text } => config.open.open(&text),
+        Commands::PrintColors => TermColors::print_colors(),
         Commands::Completions { shell } => {
             print_completions(shell, &mut Cli::command());
             Ok(())

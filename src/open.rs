@@ -78,7 +78,7 @@ impl Open {
 
         let (is_commit, text) = if text == "." {
             (false, text.to_string())
-        } else if let Some(real_commit) = Git::is_commit(text) {
+        } else if let Some(real_commit) = Git::rev_parse(text) {
             (true, real_commit)
         } else {
             (false, text.to_string())
