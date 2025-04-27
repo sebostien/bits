@@ -1,7 +1,7 @@
-use std::{path::PathBuf, process::ExitCode};
-
 use anyhow::{anyhow, Result};
-use clap::{arg, Parser, Subcommand};
+use clap::{arg, Command, CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Generator, Shell};
+use std::{io, path::PathBuf, process::ExitCode};
 
 mod config;
 mod git;
@@ -24,6 +24,16 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     Open { text: String },
+    Completions { shell: Shell },
+}
+
+fn print_completions<G: Generator>(generator: G, cmd: &mut Command) {
+    generate(
+        generator,
+        cmd,
+        cmd.get_name().to_string(),
+        &mut io::stdout(),
+    );
 }
 
 fn main() -> ExitCode {
@@ -52,5 +62,9 @@ pub fn run(args: Cli) -> Result<()> {
 
     match args.command {
         Commands::Open { text } => config.open.open(&text),
+        Commands::Completions { shell } => {
+            print_completions(shell, &mut Cli::command());
+            Ok(())
+        }
     }
 }
