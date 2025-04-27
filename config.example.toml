@@ -1,0 +1,31 @@
+[open]
+program = "/usr/bin/firefox"
+
+# Matches the given pattern and replaces t 
+patterns = [
+  { pattern = "^(https?://.+)$", url = "<pat1>" },
+  { pattern = "(TEST-\\d{4,5})", url = "example.com/<pat1>" },
+]
+
+[open.git.github_ssh]
+# Matches this git remote from current working directory.
+remote = "git@github.com:(.+)/(.+).git"
+# If the remote matches and the input text is ".", open this url
+url = "https://github.com/<r1>/<r2>/"
+# If the remote matches and the input text is a commit hash.
+# Open this url (replacing <commit> with the commit)
+commit = "https://github.com/<r1>/<r2>/commit/<commit>"
+# If the remote matches and the input text matches the pattern.
+# Open the url (replacing <patN> with the groups)
+# Will take the first one that matches
+patterns = [
+  { pattern = "^(\\d+)$", url = "https://github.com/<r1>/<r2>/pull/<pat1>" }
+]
+
+[open.git.github_https]
+remote = "https://github.com/(.+)/(.+).git"
+url = "https://github.com/<r1>/<r2>/"
+commit = "https://github.com/<r1>/<r2>/commit/<commit>"
+patterns = [
+  { pattern = "^(\\d+)$", url = "https://github.com/<r1>/<r2>/pull/<pat1>" }
+]
