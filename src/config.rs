@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::PathBuf;
 
 use crate::open::Open;
 
@@ -10,22 +10,33 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_file<P>(file: P) -> Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let contents = std::fs::read_to_string(&file)?;
+    pub fn new(config_file: Option<PathBuf>) -> Result<Self> {
+        let config_file = Self::get_config_file(config_file)?;
+        let contents = std::fs::read_to_string(&config_file)?;
 
         match toml::from_str(&contents) {
             Ok(c) => Ok(c),
             Err(e) => {
-                let file = file.as_ref().to_str().unwrap();
-                if let Some(span) = e.span() {
-                    Err(anyhow!("{file}:{} {}", span.start, e.message()))
-                } else {
-                    Err(anyhow!("{file} {}", e.message()))
-                }
+                let file = config_file.to_str().unwrap_or("config");
+                Err(anyhow!("{file} :: {}", e.message()))
             }
         }
+    }
+
+    fn get_config_file(config_file: Option<PathBuf>) -> Result<PathBuf> where {
+        if let Some(c) = config_file {
+            return Ok(c);
+        }
+
+        if let Some(mut home) = dirs::config_dir() {
+            home.push("bits/config.toml");
+            if home.exists() {
+                return Ok(home);
+            }
+        }
+
+        Err(anyhow!(
+            "Could not find config. Please use the `--config-file` option"
+        ))
     }
 }

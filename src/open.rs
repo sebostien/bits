@@ -1,14 +1,16 @@
 use anyhow::{anyhow, Result};
+use log::{error, info};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use crate::git::Git;
 
 #[derive(Serialize, Deserialize)]
 pub struct Open {
-    program: String,
+    program: PathBuf,
     patterns: Vec<PatternOpen>,
     git: HashMap<String, GitOpen>,
 }
@@ -109,7 +111,7 @@ impl Open {
             }
             Ok(None) => {}
             Err(e) => {
-                eprintln!("{e}");
+                error!("{e}");
             }
         }
 
@@ -117,9 +119,16 @@ impl Open {
     }
 
     fn open_str(&self, s: &str) -> Result<()> {
-        println!("Opening: {s}");
+        info!("Opening: {s}");
 
-        Command::new(&self.program)
+        let prog_canon = self.program.canonicalize();
+        let program = if let Ok(p) = prog_canon.as_ref() {
+            p
+        } else {
+            &self.program
+        };
+
+        Command::new(program)
             .args([s])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -181,7 +190,7 @@ mod tests {
 
     fn get_open_config() -> Open {
         Open {
-            program: "echo".to_string(),
+            program: "echo".into(),
             patterns: vec![PatternOpen {
                 priority: 1,
                 pattern: r"test-(\d+)".to_string(),
