@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{arg, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
+use git::Git;
 use log::error;
 use std::{io, path::PathBuf, process::ExitCode};
 use term_colors::TermColors;
@@ -29,9 +30,17 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    Open { text: String },
+    Open {
+        text: String,
+    },
     PrintColors,
-    Completions { shell: Shell },
+    Completions {
+        shell: Shell,
+    },
+    Branches {
+        #[arg(short, num_args(0..))]
+        author: Vec<String>,
+    },
 }
 
 fn print_completions<G: Generator>(generator: G, cmd: &mut Command) {
@@ -61,6 +70,7 @@ pub fn run(args: Cli) -> Result<()> {
     match args.command {
         Commands::Open { text } => config.open.open(&text),
         Commands::PrintColors => TermColors::print_colors(),
+        Commands::Branches { author } => Git::branches(&author),
         Commands::Completions { shell } => {
             print_completions(shell, &mut Cli::command());
             Ok(())

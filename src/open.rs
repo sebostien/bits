@@ -81,7 +81,7 @@ impl Open {
 
         let (is_commit, text) = if text == "." {
             (false, text.to_string())
-        } else if let Some(real_commit) = Git::rev_parse(text) {
+        } else if let Some(real_commit) = Git::rev_parse(text).ok().flatten() {
             (true, real_commit)
         } else {
             (false, text.to_string())
@@ -143,7 +143,7 @@ impl GitOpen {
     fn get_base(&self, text: &str, is_commit: bool) -> Option<String> {
         if text == "." {
             if let Some(branch_url) = &self.branch {
-                if let Some(branch) = Git::get_branch() {
+                if let Some(branch) = Git::get_branch().ok().flatten() {
                     return Some(branch_url.replacen("<branch>", &branch, 1));
                 }
             }

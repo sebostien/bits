@@ -1,16 +1,15 @@
 [open]
 program = "/usr/bin/firefox"
 
-# TODO: Transform match group, e.g. uppercase
-
 # Matches the given pattern and replaces t 
 patterns = [
   { pattern = "^(https?://.+)$", url = "<pat1>" },
   { pattern = "(TEST-\\d{4,5})", url = "example.com/<pat1>" },
   { pattern = "^~/(.*)$", url = "/home/me/<pat1>" },
-  { pattern = "^([\\./]+.*)$", url = "<pat1>" },
+  { pattern = "^([\\./]*/.*)$", url = "<pat1>" },
   # Open mounted windows drive (WSL)
   { pattern = "^/mnt/(\\w+)/(.*)", url = "<pat1>:/<pat2>" },
+
 ]
 
 [open.git.github_ssh]
