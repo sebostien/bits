@@ -1,11 +1,12 @@
 use anyhow::Result;
+use branches::Branches;
 use clap::{arg, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
-use git::Git;
 use log::error;
 use std::{io, path::PathBuf, process::ExitCode};
 use term_colors::TermColors;
 
+mod branches;
 mod config;
 mod git;
 mod open;
@@ -40,6 +41,8 @@ pub enum Commands {
     Branches {
         #[arg(short, num_args(0..))]
         author: Vec<String>,
+        #[arg(short('r'), long("remote"), default_value = "false")]
+        include_remotes: bool,
     },
 }
 
@@ -70,7 +73,10 @@ pub fn run(args: Cli) -> Result<()> {
     match args.command {
         Commands::Open { text } => config.open.open(&text),
         Commands::PrintColors => TermColors::print_colors(),
-        Commands::Branches { author } => Git::branches(&author),
+        Commands::Branches {
+            author,
+            include_remotes,
+        } => Branches::list(&author, include_remotes),
         Commands::Completions { shell } => {
             print_completions(shell, &mut Cli::command());
             Ok(())

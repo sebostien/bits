@@ -15,6 +15,16 @@ pub struct Open {
     git: HashMap<String, GitOpen>,
 }
 
+impl Default for Open {
+    fn default() -> Self {
+        Self {
+            program: "xdg-open".into(),
+            patterns: Vec::new(),
+            git: HashMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct PatternOpen {
     #[serde(default)]

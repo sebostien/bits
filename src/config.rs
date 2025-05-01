@@ -2,11 +2,14 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::open::Open;
+use crate::{branches::Branches, open::Open};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
     pub open: Open,
+    #[serde(default)]
+    pub branches: Branches,
 }
 
 impl Config {

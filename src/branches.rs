@@ -1,64 +1,33 @@
 use anyhow::{anyhow, Result};
 use log::error;
-use prettytable::{format, Cell, Row, Table};
-use std::{collections::HashMap, process::Command};
+use prettytable::color::{BLUE, BRIGHT_BLACK, GREEN};
+use prettytable::format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR;
+use prettytable::{color::RED, Attr, Cell, Row, Table};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::process::Command;
 
-pub struct Git {}
+use crate::git::GitRefField;
 
-impl Git {
-    pub fn get_remote() -> Result<Option<String>> {
-        let output = Command::new("git").args(["remote", "-v"]).output()?;
+#[derive(Serialize, Deserialize)]
+pub struct Branches {}
 
-        if !output.status.success() {
-            return Ok(None);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        for line in stdout.trim().lines() {
-            if let Some((_, rest)) = line.trim().split_once('\t') {
-                if let Some((remote, ty)) = rest.trim().split_once(' ') {
-                    if ty == "(push)" {
-                        return Ok(Some(remote.to_string()));
-                    }
-                }
-            }
-        }
-
-        Ok(None)
+impl Default for Branches {
+    fn default() -> Self {
+        Self {}
     }
+}
 
-    pub fn rev_parse(text: &str) -> Result<Option<String>> {
-        let output = Command::new("git").args(["rev-parse", text]).output()?;
-
-        if !output.status.success() {
-            return Ok(None);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(Some(stdout.trim().to_string()))
-    }
-
-    pub fn get_branch() -> Result<Option<String>> {
-        let output = Command::new("git")
-            .args(["branch", "--show-current"])
-            .output()?;
-
-        if !output.status.success() {
-            return Ok(None);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        Ok((!stdout.is_empty()).then_some(stdout))
-    }
-
-    pub fn branches(authors: &[String]) -> Result<()> {
+impl Branches {
+    pub fn list(authors: &[String], include_remotes: bool) -> Result<()> {
         let outputs = [
-            "%(authorname)",
-            "%(authordate:iso8601)",
-            "%(refname)",
-            "%(contents:subject)",
+            GitRefField::AuthorName,
+            GitRefField::AuthorDateISO,
+            GitRefField::RefName,
+            GitRefField::ObjectName,
+            GitRefField::Subject,
         ]
+        .map(<&str>::from)
         .join("%00");
 
         let output = Command::new("git")
@@ -77,7 +46,7 @@ impl Git {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let authors_filter = split_authors(authors);
 
-        let mut matches = HashMap::new();
+        let mut matches: HashMap<&str, ForEachRef<'_>> = HashMap::new();
 
         for line in stdout.trim().lines() {
             let mut this_ref = match ForEachRef::from_output(line) {
@@ -94,23 +63,32 @@ impl Git {
             let author_vec = this_ref.author_name.to_lowercase();
             let author_vec = author_vec.split_whitespace().collect::<Vec<_>>();
 
-            let mut is_local = this_ref.is_local;
-            let mut is_remote = this_ref.is_remote;
-
             if !authors_filter.is_empty()
                 && !authors_filter
                     .iter()
                     .any(|f| f.iter().all(|f| author_vec.contains(&f.as_str())))
             {
-                is_local = false;
-                is_remote = false;
                 this_ref.is_local = false;
                 this_ref.is_remote = false;
             }
 
-            let entry = matches.entry(this_ref.refname).or_insert(this_ref);
-            entry.is_local = entry.is_local || is_local;
-            entry.is_remote = entry.is_remote || is_remote;
+            if let Some(prev) = matches.get_mut(this_ref.ref_name) {
+                prev.is_local = prev.is_local || this_ref.is_local;
+                prev.is_remote = prev.is_remote || this_ref.is_remote;
+
+                if prev.object_name != this_ref.object_name {
+                    prev.diverged = true;
+                    if prev.is_remote {
+                        // The other is remote. Let's keep the local info
+                        prev.subject = this_ref.subject;
+                        prev.object_name = this_ref.object_name;
+                        prev.author_name = this_ref.author_name;
+                        prev.author_date = this_ref.author_date;
+                    }
+                }
+            } else {
+                matches.insert(this_ref.ref_name, this_ref);
+            }
         }
 
         let mut matches = matches.into_values().collect::<Vec<_>>();
@@ -121,19 +99,19 @@ impl Git {
             Cell::new("Type"),
             Cell::new("Name"),
             Cell::new("Author"),
-            Cell::new("Date"),
+            Cell::new("Updated"),
             Cell::new("Subject"),
         ]));
 
-        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+        table.set_format(*FORMAT_NO_BORDER_LINE_SEPARATOR);
 
         for m in matches {
-            if let Some(row) = m.into() {
+            if let Some(row) = m.to_row(include_remotes) {
                 table.add_row(row);
             }
         }
 
-        println!("{table}");
+        table.print_tty(false)?;
 
         Ok(())
     }
@@ -143,10 +121,12 @@ impl Git {
 struct ForEachRef<'a> {
     author_name: &'a str,
     author_date: &'a str,
-    refname: &'a str,
+    ref_name: &'a str,
+    object_name: &'a str,
     subject: &'a str,
     is_remote: bool,
     is_local: bool,
+    diverged: bool,
 }
 
 impl<'a> PartialOrd for ForEachRef<'a> {
@@ -169,28 +149,7 @@ impl<'a> PartialOrd for ForEachRef<'a> {
 
 impl<'a> PartialEq for ForEachRef<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.author_name == other.author_name && self.refname == other.refname
-    }
-}
-
-impl From<ForEachRef<'_>> for Option<Row> {
-    fn from(value: ForEachRef<'_>) -> Self {
-        let ty = match (value.is_local, value.is_remote) {
-            (true, true) => "Both",
-            (false, true) => "Remote",
-            (true, false) => "Local",
-            (false, false) => {
-                return None;
-            }
-        };
-
-        Some(Row::new(vec![
-            Cell::new(ty),
-            Cell::new(value.refname),
-            Cell::new(value.author_name),
-            Cell::new(value.author_date),
-            Cell::new(value.subject),
-        ]))
+        self.author_name == other.author_name && self.ref_name == other.ref_name
     }
 }
 
@@ -198,7 +157,7 @@ impl<'a> ForEachRef<'a> {
     fn from_output(output: &'a str) -> Result<Option<Self>, String> {
         let line = output.trim().split('\0').collect::<Vec<_>>();
 
-        if line.len() != 4 {
+        if line.len() != 5 {
             return Err(format!(
                 "Unexpected result returned trying to parse for-each-ref: '{output}'"
             ));
@@ -206,32 +165,66 @@ impl<'a> ForEachRef<'a> {
 
         let author_name = line[0];
         let author_date = line[1];
-        let mut refname = line[2];
-        let subject = line[3];
+        let mut ref_name = line[2];
+        let object_name = line[3];
+        let subject = line[4];
 
         let mut is_remote = false;
         let mut is_local = false;
 
-        if refname.starts_with("refs/tags") {
+        if ref_name.starts_with("refs/tags") {
             return Ok(None);
         }
 
-        if refname.starts_with("refs/heads/") {
-            refname = &refname["refs/heads/".len()..];
+        if ref_name.starts_with("refs/heads/") {
+            ref_name = &ref_name["refs/heads/".len()..];
             is_local = true;
-        } else if refname.starts_with("refs/remotes/origin/") {
-            refname = &refname["refs/remotes/origin/".len()..];
+        } else if ref_name.starts_with("refs/remotes/origin/") {
+            ref_name = &ref_name["refs/remotes/origin/".len()..];
             is_remote = true;
         }
 
         Ok(Some(Self {
             author_name,
             author_date,
-            refname,
+            ref_name,
+            object_name,
             subject,
             is_remote,
             is_local,
+            diverged: false,
         }))
+    }
+
+    fn to_row(self, include_remotes: bool) -> Option<Row> {
+        if self.diverged {
+            assert!(self.is_local);
+            assert!(self.is_remote);
+        }
+
+        let ty = match (self.is_local, self.is_remote) {
+            (true, true) if self.diverged => Cell::new("D")
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(RED)),
+            (true, true) => Cell::new("B")
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(GREEN)),
+            (true, false) => Cell::new("L").with_style(Attr::ForegroundColor(BLUE)),
+            (false, true) if include_remotes => Cell::new("R")
+                .with_style(Attr::Bold)
+                .with_style(Attr::ForegroundColor(BRIGHT_BLACK)),
+            _ => {
+                return None;
+            }
+        };
+
+        Some(Row::new(vec![
+            ty,
+            Cell::new(self.ref_name),
+            Cell::new(self.author_name),
+            Cell::new(self.author_date),
+            Cell::new(self.subject),
+        ]))
     }
 }
 
